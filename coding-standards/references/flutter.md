@@ -23,7 +23,7 @@ lib/
 │       └── presentation/
 │           ├── screens/
 │           ├── widgets/      # Feature-specific widgets
-│           └── providers/    # Riverpod providers
+│           └── providers/    #  Providers
 ├── shared/
 │   ├── widgets/              # App-wide shared widgets
 │   ├── utils/
@@ -36,22 +36,45 @@ lib/
 
 ---
 
-## State Management (Riverpod)
+## State Management (Provider)
 
-- Use Riverpod (code-gen flavor: `@riverpod`) for all state
+- Use Provider for all app state in Flutter projects
 - Never use `setState` for anything beyond purely local ephemeral UI state (e.g. a toggle within a single widget)
-- Provider types by use case:
-  - `@riverpod` (AutoDispose) — default for most providers; disposed when no longer listened
-  - `@Riverpod(keepAlive: true)` — for global persistent state (auth, app config)
-  - `AsyncNotifierProvider` — for async data with loading/error states
+- Provider classes by use case:
+  - `ChangeNotifierProvider` — default for state that changes over time and needs notifications
+  - `Provider` — for immutable dependencies or simple read-only values
+  - `FutureProvider` — for async data with loading/error states
   - `StreamProvider` — for real-time data streams
+- Keep provider classes small and focused; separate UI state from business logic and repository access
 
 ```dart
-// Pattern to follow
-@riverpod
-Future<List<Student>> students(StudentsRef ref) async {
-  return ref.watch(studentRepositoryProvider).getAll();
+class StudentsNotifier extends ChangeNotifier {
+  final StudentRepository repository;
+  List<Student> students = [];
+  bool isLoading = false;
+  Object? error;
+
+  StudentsNotifier(this.repository);
+
+  Future<void> loadStudents() async {
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      students = await repository.getAll();
+      error = null;
+    } catch (e) {
+      error = e;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 }
+
+final studentsProvider = ChangeNotifierProvider<StudentsNotifier>((ref) {
+  return StudentsNotifier(ref.read(studentRepositoryProvider));
+});
 ```
 
 ---
